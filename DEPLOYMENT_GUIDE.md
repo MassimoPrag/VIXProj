@@ -123,13 +123,18 @@ streamlit run monetary_app.py --server.port=$PORT --server.address=0.0.0.0
 ### 1. **Optimize requirements.txt**:
 ```txt
 streamlit>=1.28.0
-pandas>=1.5.0
+pandas>=1.5.0,<2.0.0
 numpy>=1.24.0
-plotly>=5.17.0
+plotly>=5.15.0
 yfinance>=0.2.18
-pandas-datareader>=0.10.0
+pandas-datareader==0.10.0
 pycoingecko>=3.1.0
+requests>=2.31.0
+setuptools>=65.0.0
+fredapi>=0.5.0
 ```
+
+**Note**: `setuptools` and `fredapi` are included to fix the "No module named 'distutils'" error that can occur with FRED data fetching in Python 3.12+.
 
 ### 2. **Add Error Handling**:
 Your app already has good error handling with synthetic data fallbacks.
@@ -226,7 +231,13 @@ st.session_state.page_views += 1
 - Ensure all files are in repository root
 - Check `requirements.txt` includes all dependencies
 
-### 2. **API Rate Limiting**:
+### 2. **"No module named 'distutils'" Error**:
+- **Problem**: FRED data fetching fails with distutils error
+- **Solution**: The updated `requirements.txt` includes `setuptools>=65.0.0` and `fredapi>=0.5.0`
+- **Symptoms**: CPI vs P=MV/Q charts show only synthetic data
+- **Fix**: Redeploy with the updated requirements.txt
+
+### 3. **API Rate Limiting**:
 - Your app handles this gracefully with synthetic data
 - Consider adding user feedback for rate limit status
 

@@ -27,31 +27,99 @@ class MonetaryDataHandler:
     def get_fred_data(self, symbol: str, start: str, end: str) -> pd.Series:
         """Fetch data from FRED API (Federal Reserve Economic Data)."""
         try:
-            import pandas_datareader.data as web
-            
-            # Cache key
-            cache_key = f"{symbol}_{start}_{end}"
-            
-            if cache_key in self.fred_data_cache:
-                return self.fred_data_cache[cache_key]
-            
-            # Fetch data
-            data = web.get_data_fred(symbol, start, end)
-            
-            if not data.empty:
-                # Clean and process data
-                data = data.dropna()
-                data = data[data.index >= pd.to_datetime(start)]
-                data = data[data.index <= pd.to_datetime(end)]
+            # Try fredapi first (most reliable)
+            try:
+                from fredapi import Fred
+                fred = Fred()  # No API key needed for public data
+                data = fred.get_series(symbol, start, end)
                 
-                # Cache the result
-                self.fred_data_cache[cache_key] = data.squeeze()
+                if not data.empty:
+                    # Clean and process data
+                    data = data.dropna()
+                    
+                    # Cache the result
+                    cache_key = f"{symbol}_{start}_{end}"
+                    self.fred_data_cache[cache_key] = data
+                    
+                    logger.info(f"Successfully fetched {len(data)} data points for {symbol} from FRED via fredapi")
+                    return data
+                    
+            except (ImportError, Exception) as e:
+                logger.debug(f"fredapi failed: {e}, trying pandas_datareader")
                 
-                logger.info(f"Successfully fetched {len(data)} data points for {symbol} from FRED")
-                return data.squeeze()
-            else:
-                logger.warning(f"No data found for {symbol} from FRED")
-                return pd.Series()
+                # Fallback to pandas_datareader
+                try:
+                    import pandas_datareader.data as web
+                    
+                    # Cache key
+                    cache_key = f"{symbol}_{start}_{end}"
+                    
+                    if cache_key in self.fred_data_cache:
+                        return self.fred_data_cache[cache_key]
+                    
+                    # Fetch data
+                    data = web.get_data_fred(symbol, start, end)
+                    
+                    if not data.empty:
+                        # Clean and process data
+                        data = data.dropna()
+                        data = data[data.index >= pd.to_datetime(start)]
+                        data = data[data.index <= pd.to_datetime(end)]
+                        
+                        # Cache the result
+                        self.fred_data_cache[cache_key] = data.squeeze()
+                        
+                        logger.info(f"Successfully fetched {len(data)} data points for {symbol} from FRED")
+                        return data.squeeze()
+                        
+                except Exception as e2:
+                    logger.debug(f"pandas_datareader failed: {e2}, trying direct HTTP")
+                    
+                    # Final fallback: direct HTTP request to FRED
+                    try:
+                        import requests
+                        
+                        # FRED provides JSON API without requiring API key for some data
+                        url = f"https://api.stlouisfed.org/fred/series/observations"
+                        params = {
+                            'series_id': symbol,
+                            'api_key': 'demo',  # Demo key for public data
+                            'file_type': 'json',
+                            'observation_start': start,
+                            'observation_end': end
+                        }
+                        
+                        response = requests.get(url, params=params, timeout=10)
+                        
+                        if response.status_code == 200:
+                            json_data = response.json()
+                            if 'observations' in json_data:
+                                observations = json_data['observations']
+                                
+                                # Convert to pandas Series
+                                dates = []
+                                values = []
+                                
+                                for obs in observations:
+                                    if obs['value'] != '.':  # FRED uses '.' for missing values
+                                        dates.append(pd.to_datetime(obs['date']))
+                                        values.append(float(obs['value']))
+                                
+                                if dates and values:
+                                    data = pd.Series(values, index=dates)
+                                    
+                                    # Cache the result
+                                    cache_key = f"{symbol}_{start}_{end}"
+                                    self.fred_data_cache[cache_key] = data
+                                    
+                                    logger.info(f"Successfully fetched {len(data)} data points for {symbol} from FRED via HTTP")
+                                    return data
+                                    
+                    except Exception as e3:
+                        logger.debug(f"HTTP request failed: {e3}")
+                
+            logger.warning(f"All FRED data fetching methods failed for {symbol}")
+            return pd.Series()
                 
         except Exception as e:
             logger.error(f"Error fetching FRED data for {symbol}: {e}")
