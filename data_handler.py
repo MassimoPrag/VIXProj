@@ -178,53 +178,6 @@ class MonetaryDataHandler:
             logger.error(f"Error calculating P=MV/Q: {e}")
             return pd.Series()
     
-    def get_synthetic_data(self, start: str, end: str) -> pd.DataFrame:
-        """Generate synthetic data for demonstration when real data is not available."""
-        try:
-            # Create date range
-            dates = pd.date_range(start=start, end=end, freq='D')
-            
-            # Generate synthetic CPI (trending upward with volatility)
-            np.random.seed(42)
-            cpi_trend = np.linspace(200, 280, len(dates))
-            cpi_noise = np.random.normal(0, 2, len(dates))
-            cpi = cpi_trend + cpi_noise
-            
-            # Generate synthetic P=MV/Q (similar trend but different volatility)
-            np.random.seed(43)
-            p_trend = np.linspace(180, 300, len(dates))
-            p_noise = np.random.normal(0, 5, len(dates))
-            p_theory = p_trend + p_noise
-            
-            # Generate synthetic money supply (exponential growth)
-            np.random.seed(44)
-            money_supply_base = 15000
-            money_supply_growth = np.exp(np.linspace(0, 0.8, len(dates)))
-            money_supply = money_supply_base * money_supply_growth
-            
-            # Generate synthetic Bitcoin price (volatile but trending up)
-            np.random.seed(45)
-            btc_base = 30000
-            btc_trend = np.exp(np.linspace(0, 1.2, len(dates)))
-            btc_volatility = np.random.normal(1, 0.3, len(dates))
-            btc_price = btc_base * btc_trend * btc_volatility
-            btc_price = np.maximum(btc_price, 1000)  # Floor price
-            
-            # Create DataFrame
-            data = pd.DataFrame({
-                'CPI': cpi,
-                'P': p_theory,
-                'M2SL': money_supply,
-                'BTC-USD': btc_price
-            }, index=dates)
-            
-            logger.info(f"Generated synthetic data for {len(data)} data points")
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error generating synthetic data: {e}")
-            return pd.DataFrame()
-
 def get_research_data(start: str, end: str) -> pd.DataFrame:
     """
     Main function to get research data for monetary debasement analysis.
@@ -306,14 +259,15 @@ def get_research_data(start: str, end: str) -> pd.DataFrame:
                     logger.info(f"Successfully loaded real data with {len(df)} data points")
                     return df
                 else:
-                    logger.warning("Insufficient real data points, falling back to synthetic data")
+                    logger.warning("Insufficient real data points")
+                    return pd.DataFrame()
                 
     except Exception as e:
         logger.error(f"Error loading real data: {e}")
     
-    # Fallback to synthetic data
-    logger.info("Using synthetic data for demonstration")
-    return handler.get_synthetic_data(start, end)
+    # Return empty DataFrame if no real data available
+    logger.warning("No real data available")
+    return pd.DataFrame()
 
 def get_asset_data(symbols: list, start: str, end: str) -> Dict[str, pd.Series]:
     """Get asset data for multiple symbols using optimized methods."""

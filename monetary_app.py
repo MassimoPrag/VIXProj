@@ -64,10 +64,6 @@ st.markdown("""
         background-color: #d4edda;
         color: #155724;
     }
-    .synthetic-data {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
     .sidebar-info {
         font-size: 0.9rem;
         color: #666;
@@ -454,7 +450,8 @@ def real_returns_analysis(data):
             "Analysis period:",
             options=['1 Year', '3 Years', '5 Years', '10 Years', 'All Data'],
             index=2,
-            help="Select the time period for real returns analysis"
+            help="Select the time period for real returns analysis",
+            key="real_returns_time_period"
         )
     
     if not selected_assets:
@@ -515,20 +512,6 @@ def real_returns_analysis(data):
             else:
                 st.write(f"**{symbol}**: No data available")
     
-    # Check if we're using synthetic data
-    if len(asset_data) == len(selected_assets):
-        # Check if any of the data looks synthetic (consistent with our generation method)
-        synthetic_detected = False
-        for symbol, data_series in asset_data.items():
-            if len(data_series) > 0:
-                # Simple heuristic: synthetic data will have very regular date spacing
-                if hasattr(data_series.index, 'freq') or len(data_series) > 1000:
-                    synthetic_detected = True
-                    break
-        
-        if synthetic_detected:
-            st.info("ℹ️ **Note**: Using synthetic data for demonstration due to API limitations. Real market data will be used when available.")
-    
     # Check if we have inflation data
     if data.empty:
         st.error("❌ No data available for analysis")
@@ -540,16 +523,11 @@ def real_returns_analysis(data):
         st.info("💡 Available columns: " + ", ".join(data.columns))
         return
     
-    # Handle missing P data by creating synthetic P data based on CPI
+    # Check if P data is available
     if 'P' not in data.columns:
-        st.warning("⚠️ P=MV/Q data not available. Using synthetic P data based on CPI for demonstration.")
-        # Create synthetic P data with higher volatility than CPI
-        cpi_returns = data['CPI'].pct_change().fillna(0)
-        synthetic_p_returns = cpi_returns * 1.5 + np.random.normal(0, 0.002, len(cpi_returns))  # Higher inflation
-        synthetic_p_series = (1 + synthetic_p_returns).cumprod() * data['CPI'].iloc[0]
-        data = data.copy()
-        data['P'] = synthetic_p_series
-        st.info("✅ Created synthetic P data for analysis")
+        st.error("❌ P=MV/Q data not available. Cannot perform analysis without theoretical inflation data.")
+        st.info("💡 Please ensure FRED data (M2, Velocity, GDP) is loading properly.")
+        return
     
     # Resample economic data to daily frequency for better alignment
     try:
@@ -590,15 +568,22 @@ def real_returns_analysis(data):
             if valid_results:
                 analysis_results = valid_results
             else:
-                # If no valid results, create a simple demonstration with synthetic data
-                st.info("⚠️ Limited overlapping data detected. Creating demonstration with synthetic data.")
-                analysis_results = create_synthetic_demonstration(selected_assets)
+                # If no valid results, show error message
+                st.error("❌ Limited overlapping data detected. Cannot perform analysis.")
+                st.info("💡 **Suggestions:**")
+                st.info("• Try a different time period with more data")
+                st.info("• Select different assets")
+                st.info("• Check if economic data is available for the selected period")
+                return
                 
         except Exception as e:
             st.error(f"❌ Error calculating real returns: {str(e)}")
             st.info("💡 This may be due to insufficient overlapping data between assets and economic indicators.")
-            st.info("🔄 Creating demonstration with synthetic data...")
-            analysis_results = create_synthetic_demonstration(selected_assets)
+            st.info("� **Suggestions:**")
+            st.info("• Try a different time period")
+            st.info("• Select different assets")
+            st.info("• Check if economic data is available for the selected period")
+            return
     
     if not analysis_results:
         st.error("❌ Could not calculate real returns. This may be due to insufficient overlapping data.")
@@ -643,7 +628,8 @@ def real_returns_analysis(data):
     selected_asset_display = st.selectbox(
         "Select an asset for detailed analysis:",
         options=asset_display,
-        help="Choose an asset to view detailed price and return charts"
+        help="Choose an asset to view detailed price and return charts",
+        key="real_returns_asset_selector"
     )
     
     selected_asset = asset_symbols[asset_display.index(selected_asset_display)]
@@ -688,136 +674,6 @@ def real_returns_analysis(data):
         st.markdown("**🛡️ Best Inflation Hedges (P-Theory)**")
         display_top_performers(comparison_table, 'Real_Return_P', "P-theory adjusted returns")
 
-
-def create_synthetic_demonstration(symbols: List[str]) -> Dict[str, dict]:
-    """Create synthetic data for demonstration purposes."""
-    results = {}
-    
-    # Simple demonstration data
-    for symbol in symbols:
-        # Create synthetic date range
-        dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
-        
-        # Generate synthetic returns and metrics
-        nominal_return = np.random.normal(0.08, 0.03)  # 8% +/- 3%
-        real_return_cpi = np.random.normal(0.05, 0.02)  # 5% +/- 2%
-        real_return_p = np.random.normal(0.02, 0.03)  # 2% +/- 3%
-        volatility = np.random.normal(0.15, 0.05)  # 15% +/- 5%
-        
-        # CPI-adjusted results
-        cpi_result = pd.DataFrame({
-            'Annualized_Nominal': [nominal_return],
-            'Annualized_Real': [real_return_cpi],
-            'Real_Volatility': [volatility],
-            'Real_Sharpe': [real_return_cpi / volatility if volatility > 0 else 0],
-            'Nominal_Returns': np.random.normal(0.0008, 0.02, len(dates)),  # Daily returns
-            'Real_Returns': np.random.normal(0.0005, 0.02, len(dates)),     # Daily real returns
-            'Real_Cumulative': (1 + np.random.normal(0.0005, 0.02, len(dates))).cumprod()
-        }, index=dates)
-        
-        # P-theory adjusted results  
-        p_result = pd.DataFrame({
-            'Annualized_Nominal': [nominal_return],
-            'Annualized_Real': [real_return_p],
-            'Real_Volatility': [volatility],
-            'Real_Sharpe': [real_return_p / volatility if volatility > 0 else 0],
-            'Nominal_Returns': np.random.normal(0.0008, 0.02, len(dates)),  # Daily returns
-            'Real_Returns': np.random.normal(0.0002, 0.02, len(dates)),     # Daily real returns (lower than CPI)
-            'Real_Cumulative': (1 + np.random.normal(0.0002, 0.02, len(dates))).cumprod()
-        }, index=dates)
-        
-        results[symbol] = {
-            'cpi_adjusted': cpi_result,
-            'p_theory_adjusted': p_result
-        }
-    
-    return results
-    
-    # Create comprehensive visualization
-    st.subheader("📈 Real Returns Analysis Results")
-    
-    # Data status indicator
-    col1, col2, col3 = st.columns([1, 1, 2])
-    
-    with col1:
-        st.metric("Assets Analyzed", len(asset_data))
-    
-    with col2:
-        st.metric("Data Points", len(data))
-    
-    with col3:
-        # Determine data type
-        is_synthetic = any('Synthetic' in str(results.get('cpi_adjusted', {}).get('Inflation_Measure', '')) 
-                          for results in analysis_results.values())
-        
-        if is_synthetic:
-            st.info("📊 **Data Type**: Includes synthetic data for demonstration")
-        else:
-            st.success("📊 **Data Type**: Real market data")
-    
-    # Asset selector for detailed charts
-    st.subheader("📊 Individual Asset Analysis")
-    
-    # Dropdown for asset selection
-    asset_symbols = list(analysis_results.keys())
-    asset_names = [analyzer.default_assets.get(symbol, symbol) for symbol in asset_symbols]
-    asset_display = [f"{symbol} ({name})" for symbol, name in zip(asset_symbols, asset_names)]
-    
-    selected_asset_display = st.selectbox(
-        "Select an asset for detailed analysis:",
-        options=asset_display,
-        help="Choose an asset to view detailed price and return charts"
-    )
-    
-    selected_asset = asset_symbols[asset_display.index(selected_asset_display)]
-    selected_name = analyzer.default_assets.get(selected_asset, selected_asset)
-    
-    # Create two main charts for the selected asset
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown(f"**� {selected_name} - Price Levels**")
-        price_chart = create_price_level_chart(selected_asset, selected_name, asset_data, data, analysis_results)
-        st.plotly_chart(price_chart, use_container_width=True)
-    
-    with col2:
-        st.markdown(f"**📊 {selected_name} - Returns Comparison**")
-        returns_chart = create_returns_chart(selected_asset, selected_name, analysis_results)
-        st.plotly_chart(returns_chart, use_container_width=True)
-    
-    # Comparison table for all assets
-    st.subheader("� Assets Comparison Table")
-    
-    comparison_table = create_assets_comparison_table(analysis_results, analyzer)
-    
-    if not comparison_table.empty:
-        # Format the table for better display
-        formatted_table = format_comparison_table(comparison_table)
-        st.dataframe(formatted_table, use_container_width=True, hide_index=False)
-        
-        # Add download button for the table
-        csv = comparison_table.to_csv()
-        st.download_button(
-            label="� Download Comparison Table as CSV",
-            data=csv,
-            file_name=f"real_returns_comparison_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No comparison data available.")
-    
-    # Performance insights
-    st.subheader("🎯 Key Performance Insights")
-    
-    insights_col1, insights_col2 = st.columns(2)
-    
-    with insights_col1:
-        st.markdown("**🏆 Top Performers (CPI-Adjusted)**")
-        display_top_performers(comparison_table, 'Real_Return_CPI', "CPI-adjusted real returns")
-    
-    with insights_col2:
-        st.markdown("**🛡️ Best Inflation Hedges (P-Theory)**")
-        display_top_performers(comparison_table, 'Real_Return_P', "P-theory adjusted returns")
 
 def create_price_level_chart(symbol: str, name: str, asset_data: Dict[str, pd.Series], 
                            econ_data: pd.DataFrame, analysis_results: Dict) -> go.Figure:
@@ -1066,7 +922,8 @@ def bitcoin_analysis(data):
         time_period = st.selectbox(
             "📅 Select Time Period",
             ["Last 30 days", "Last 90 days", "Last 180 days", "Last 365 days"],
-            index=3
+            index=3,
+            key="bitcoin_time_period"
         )
     
     with col2:
@@ -1238,7 +1095,8 @@ def main():
     st.sidebar.title("💰 Monetary Debasement Research")
     page = st.sidebar.selectbox(
         "Navigate to:",
-        ["🏠 Main Dashboard", "₿ Bitcoin Analysis", "📊 Real Returns"]
+        ["🏠 Main Dashboard", "₿ Bitcoin Analysis", "📊 Real Returns"],
+        key="main_navigation"
     )
     
     # Date range selection
