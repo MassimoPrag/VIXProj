@@ -249,58 +249,40 @@ st.session_state.page_views += 1
 - Cold starts are normal on free tiers
 - Consider paid hosting for better performance
 
-## 💡 Pro Tips
+## Troubleshooting Deployment Issues
 
-### 1. **Custom Domain** (Paid hosting):
+### Common Build Errors
+
+#### 1. "Could not build wheels for pandas" Error
+
+If you encounter the error `ERROR: Could not build wheels for pandas`, try these solutions:
+
+**Solution 1: Use the main requirements.txt**
+The current `requirements.txt` uses tested, compatible versions:
+- pandas==2.0.3
+- numpy==1.24.3  
+- Python 3.9.18 (specified in runtime.txt)
+
+**Solution 2: Use fallback requirements**
+If the main requirements still fail, rename `requirements-fallback.txt` to `requirements.txt`:
 ```bash
-# For custom domain on Heroku
-heroku domains:add www.yourmonetarydashboard.com
+mv requirements.txt requirements-main.txt
+mv requirements-fallback.txt requirements.txt
 ```
 
-### 2. **Performance Optimization**:
-```python
-# Add to top of monetary_app.py
-import streamlit as st
-st.set_page_config(
-    page_title="Monetary Debasement Research",
-    page_icon="💰",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-```
+**Solution 3: Check system dependencies**
+The `packages.txt` file includes necessary build tools:
+- build-essential
+- gcc, g++
+- python3-dev
+- libatlas-base-dev
 
-### 3. **SEO Optimization**:
-```python
-# Add meta tags
-st.markdown("""
-<meta name="description" content="Analyze monetary debasement through CPI vs P=MV/Q analysis">
-<meta name="keywords" content="monetary policy, inflation, bitcoin, real returns">
-""", unsafe_allow_html=True)
-```
+#### 2. Memory or Timeout Issues
+- Streamlit Community Cloud has resource limits
+- Consider reducing the number of assets analyzed simultaneously
+- The app includes optimized data fetching to minimize API calls
 
-## 🎯 Recommended: Streamlit Community Cloud
-
-For your use case, **Streamlit Community Cloud** is perfect because:
-- ✅ **Free forever**
-- ✅ **No API keys to manage**
-- ✅ **Automatic deployments**
-- ✅ **SSL certificate included**
-- ✅ **Easy to update**
-- ✅ **Professional URL**
-
-Your app is already optimized for deployment with:
-- ✅ Proper error handling
-- ✅ API rate limiting
-- ✅ Data caching
-- ✅ Synthetic data fallbacks
-- ✅ Clean, professional UI
-
-## 🚀 Ready to Deploy!
-
-Your Monetary Debasement Dashboard is production-ready. The lack of API key requirements makes deployment extremely straightforward. Choose Streamlit Community Cloud for the easiest path to production.
-
----
-
-**Need Help?** 
-- Streamlit Docs: [docs.streamlit.io](https://docs.streamlit.io)
-- Community Forum: [discuss.streamlit.io](https://discuss.streamlit.io)
+#### 3. FRED API Issues
+- FRED data fetching has multiple fallback methods
+- No API key required for public data
+- If FRED fails, the app shows clear error messages instead of synthetic data
