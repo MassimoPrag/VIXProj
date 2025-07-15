@@ -286,3 +286,40 @@ The `packages.txt` file includes necessary build tools:
 - FRED data fetching has multiple fallback methods
 - No API key required for public data
 - If FRED fails, the app shows clear error messages instead of synthetic data
+
+## 🚨 Emergency Deployment Fixes
+
+### If the installer still returns non-zero exit code:
+
+#### Option 1: Use Minimal Requirements
+Copy the contents of `requirements-minimal.txt` to `requirements.txt`:
+```bash
+streamlit==1.28.1
+pandas==1.5.3
+numpy==1.21.6
+plotly==5.11.0
+yfinance==0.2.18
+requests==2.28.2
+fredapi==0.5.0
+```
+
+#### Option 2: Remove packages.txt entirely
+Delete the `packages.txt` file if system dependencies are causing issues.
+
+#### Option 3: Use even older pandas
+Update requirements.txt to use pandas==1.3.5:
+```
+streamlit==1.28.1
+pandas==1.3.5
+numpy==1.21.6
+plotly==5.11.0
+yfinance==0.2.18
+requests==2.28.2
+fredapi==0.5.0
+```
+
+#### Option 4: Alternative Python version
+Try Python 3.8.18 in runtime.txt:
+```
+python-3.8.18
+```
