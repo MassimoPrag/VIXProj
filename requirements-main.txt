@@ -1,0 +1,11 @@
+streamlit==1.28.1
+pandas==2.1.1
+numpy==1.24.3
+plotly==5.15.0
+yfinance==0.2.21
+pandas-datareader==0.10.0
+pycoingecko==3.1.0
+requests==2.31.0
+setuptools==68.2.2
+fredapi==0.5.0
+wheel==0.41.2
